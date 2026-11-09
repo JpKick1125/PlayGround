@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="theme-color" content="#101513" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23101513'/%3E%3Cpath d='M16 3 3 29h7l2-5h8l2 5h7L16 3Zm0 10 2 6h-4l2-6Z' fill='%23d5fa4c'/%3E%3C/svg%3E" />
+  <title>ASHFALL // Wasteland Protocol</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="game" aria-label="Ashfall wasteland game"></canvas>
+    <div class="vignette"></div>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Ashfall home"><span class="brand-mark">A</span><span>ASHFALL <i>//</i> <small>WASTELAND PROTOCOL</small></span></a>
+      <div class="region"><span class="live-dot"></span> SECTOR 07 — MOJAVE EXCLUSION ZONE <span class="weather">☼ &nbsp; DUST STORM</span></div>
+      <button class="icon-button" id="mapToggle" title="Toggle map [M]">⌖ <span>MAP</span></button>
+    </header>
+
+    <section class="mission-card panel">
+      <div class="eyebrow"><span class="eyebrow-dash"></span> ACTIVE CONTRACT <span class="contract-id">#07-441</span></div>
+      <h1>THE LAST<br><em>TRANSMISSION</em></h1>
+      <p>Recover a signal core from the abandoned relay station. The Wraiths got there first.</p>
+      <div class="objective"><span class="objective-icon">◇</span><span><b>Locate the relay station</b><small>FOLLOW THE SIGNAL &nbsp;·&nbsp; 184m</small></span><span class="objective-check">01</span></div>
+      <div class="mission-foot"><span>REWARD</span><b>240 <i>¢</i></b><span class="reward-chip">+ NEURAL CHIP</span></div>
+    </section>
+
+    <div class="compass" id="compass"><span>W</span><i></i><b>N</b><i></i><span>E</span></div>
+
+    <aside class="right-rail">
+      <div class="panel vitals">
+        <div class="vital-head"><span>VITALS</span><span class="pulse">● LIVE</span></div>
+        <div class="vital-row"><span class="vital-icon health-icon">✚</span><div class="vital-info"><div><b>INTEGRITY</b><strong id="healthNum">100</strong></div><div class="meter"><i id="healthBar"></i></div></div></div>
+        <div class="vital-row"><span class="vital-icon armor-icon">⬡</span><div class="vital-info"><div><b>ARMOR</b><strong id="armorNum">45</strong></div><div class="meter armor-meter"><i id="armorBar"></i></div></div></div>
+        <div class="vital-row"><span class="vital-icon energy-icon">ϟ</span><div class="vital-info"><div><b>NEURAL LINK</b><strong id="energyNum">72</strong></div><div class="meter energy-meter"><i id="energyBar"></i></div></div></div>
+      </div>
+      <div class="panel threat-panel"><div class="threat-label"><span class="threat-dot"></span> LOCAL THREATS</div><div class="threat-count"><b id="threatCount">03</b><span>HOSTILES<br>NEARBY</span><i class="radar">⌁</i></div></div>
+      <div class="panel minimap-panel"><div class="mini-head">AREA SCAN <span>LIVE</span></div><canvas id="minimap" width="180" height="180"></canvas><div class="map-legend"><i class="you-dot"></i> YOU <i class="hostile-dot"></i> HOSTILE <i class="loot-dot"></i> CACHE</div></div>
+    </aside>
+
+    <div class="bottom-left"><div class="zone-tag"><span class="zone-symbol">⌖</span><div><b>THE BLEACHED MILE</b><small>NEVADA, FORMER UNITED STATES</small></div></div><div class="clock"><span>LOCAL TIME</span><b id="clock">17:42</b><i>☼</i></div></div>
+
+    <div class="combat-log" id="combatLog" aria-live="polite"></div>
+    <div class="interact-prompt" id="interactPrompt"><kbd>E</kbd><span>SCAVENGE CACHE</span></div>
+
+    <section class="bottom-hud">
+      <div class="weapon-card panel"><div class="weapon-art"><div class="weapon-glow"></div><span class="weapon-glyph">⌁</span></div><div class="weapon-copy"><small>PRIMARY WEAPON <span>01 / 02</span></small><b id="weaponName">K-47 <i>RUSTMAKER</i></b><div class="weapon-meta"><span id="weaponType">ASSAULT RIFLE</span><span class="rarity">● UNCOMMON</span></div></div><div class="ammo"><b id="ammo">24<span> / 96</span></b><small id="ammoType">5.56MM</small></div><kbd>1</kbd></div>
+      <div class="quickbar"><div class="quick-item active" id="medSlot"><kbd>Q</kbd><span class="quick-icon med">✚</span><span class="quick-count" id="medCount">2</span><small>MED PATCH</small></div><div class="quick-item" id="stimSlot"><kbd>F</kbd><span class="quick-icon stim">ϟ</span><span class="quick-count" id="stimCount">1</span><small>OVERDRIVE</small></div><div class="quick-item" id="grenadeSlot"><kbd>G</kbd><span class="quick-icon grenade">◉</span><span class="quick-count" id="grenadeCount">2</span><small>FRAG</small></div></div>
+      <div class="controls-hint"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> MOVE</span><span><kbd>MOUSE</kbd> AIM</span><span><kbd>LMB</kbd> FIRE</span><span><kbd>E</kbd> LOOT</span><span><kbd>R</kbd> RELOAD</span></div>
+    </section>
+
+    <div class="toast" id="toast"></div>
+    <div class="center-message" id="centerMessage"></div>
+    <div class="touch-controls" id="touchControls"><div class="stick" id="moveStick"><i></i></div><button id="fireTouch">FIRE</button><button id="lootTouch">LOOT</button></div>
+    <div class="start-overlay" id="startOverlay"><div class="start-card"><div class="start-kicker">YEAR 2091 &nbsp; / &nbsp; 18 YEARS AFTER THE THIRD WORLD WAR</div><div class="start-title">ASH<span>FALL</span></div><div class="start-sub">THE OLD WORLD IS DEAD. <em>YOU ARE NOT.</em></div><p>America burned. The machines woke up. Now the last survivors fight over what remains.</p><button id="startButton">ENTER THE WASTELAND <span>→</span></button><div class="start-foot"><span>WASD MOVE</span><span>CLICK TO FIRE</span><span>E SCAVENGE</span></div></div></div>
+    <div class="inventory-overlay hidden" id="inventoryOverlay"><div class="inventory-card panel"><button class="close-button" id="closeInventory">×</button><div class="eyebrow">FIELD INVENTORY <span class="contract-id">[ TAB ]</span></div><h2>WHAT'S <em>YOURS</em></h2><div class="inventory-content" id="inventoryContent"></div><div class="inventory-hint">SELECT AN ITEM TO EQUIP &nbsp;·&nbsp; TAB TO CLOSE</div></div></div>
+    <div class="death-overlay hidden" id="deathOverlay"><div class="start-card"><div class="start-kicker">SIGNAL LOST &nbsp; / &nbsp; RECOVERY AVAILABLE</div><div class="start-title">DOWN<span>ED</span></div><div class="start-sub">THE WASTELAND CLAIMS ANOTHER.</div><p>Your gear remains where you fell. Get back out there, runner.</p><button id="respawnButton">REDEPLOY <span>→</span></button></div></div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
