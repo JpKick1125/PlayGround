@@ -1,24 +1,35 @@
 (()=>{'use strict';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),$=id=>document.getElementById(id);
-const keys=new Set(), touch={gas:false,brake:false,jump:false,nos:false};
+const keys=new Set(), touch={gas:false,brake:false,jump:false,nos:false,pitchUp:false,pitchDown:false};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,t)=>a+(b-a)*t,dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 let W=innerWidth,H=innerHeight,dpr=1,camera={x:0,y:0},last=performance.now(),now=0,started=false,paused=false,crashed=false,toastTimer=0,toastText='',sound=true;
 let coins=+(localStorage.getItem('overlandCoins')||0),best=+(localStorage.getItem('overlandBest')||0),runCoins=0,runDistance=0,bestJump=0,jumpDistance=0,jumpStart=0,airtime=0,shake=0;
 const upgrades={engine:0,exhaust:0,turbo:0,nos:0,tires:0};
 try{Object.assign(upgrades,JSON.parse(localStorage.getItem('overlandUpgrades')||'{}'));}catch{}
 const rigs=[
- {name:'TRAILBLAZER',klass:'4×4 · ALL TERRAIN',icon:'▰',price:0,mass:1,power:1,grip:1,wheel:19,color:'#d4b768',accent:'#39483d',length:104,height:32,max:520},
- {name:'RALLY X',klass:'RALLY · HIGH SPEED',icon:'▱',price:260,mass:.78,power:1.28,grip:.86,wheel:16,color:'#e6e2d2',accent:'#cf6149',length:98,height:28,max:680},
- {name:'MUD MULE',klass:'UTILITY · DEEP TREAD',icon:'▰',price:430,mass:1.28,power:.92,grip:1.35,wheel:22,color:'#b3a68a',accent:'#647260',length:112,height:39,max:450},
- {name:'SNOWCAT',klass:'ARCTIC · TRACKED 6×6',icon:'▰',price:650,mass:1.45,power:.95,grip:1.5,wheel:20,color:'#c9d6d5',accent:'#61a5a8',length:120,height:37,max:420},
- {name:'TROPHY TRUCK',klass:'RACE · LONG TRAVEL',icon:'▱',price:900,mass:.9,power:1.5,grip:1.12,wheel:23,color:'#e8bd4f',accent:'#313c43',length:116,height:35,max:760}
+ {name:'TOYOTA TACOMA TRD PRO',klass:'TOYOTA · MID-SIZE 4×4',maker:'TOYOTA',icon:'▰',price:0,mass:1.08,power:1,grip:1.08,wheel:19,color:'#d4b768',accent:'#39483d',length:110,height:34,max:520},
+ {name:'FORD BRONCO RAPTOR',klass:'FORD · HIGH-SPEED OFF-ROAD',maker:'FORD',icon:'▱',price:260,mass:1.18,power:1.28,grip:1.12,wheel:21,color:'#e6e2d2',accent:'#cf6149',length:108,height:36,max:640},
+ {name:'JEEP WRANGLER RUBICON',klass:'JEEP · ROCK-CRAWLING 4×4',maker:'JEEP',icon:'▰',price:430,mass:1.22,power:.96,grip:1.4,wheel:22,color:'#b3a68a',accent:'#647260',length:104,height:38,max:470},
+ {name:'LAND ROVER DEFENDER 110',klass:'LAND ROVER · ALL-TERRAIN',maker:'DEFENDER',icon:'▰',price:650,mass:1.35,power:1.08,grip:1.25,wheel:21,color:'#c9d6d5',accent:'#61a5a8',length:116,height:40,max:490},
+ {name:'PORSCHE 911 DAKAR',klass:'PORSCHE · RALLY-RAID SPORTS CAR',maker:'PORSCHE',icon:'▱',price:900,mass:.94,power:1.5,grip:1.1,wheel:18,color:'#e8bd4f',accent:'#313c43',length:108,height:30,max:700}
 ];
 let owned=JSON.parse(localStorage.getItem('overlandOwned')||'[true,false,false,false,false]');if(!Array.isArray(owned)||owned.length!==rigs.length)owned=[true,false,false,false,false];
 let rigIndex=+(localStorage.getItem('overlandRig')||0);if(!owned[rigIndex])rigIndex=0;
 const car={x:100,y:300,vx:0,vy:0,angle:0,av:0,grounded:false,fuel:100,hull:100,nos:100,wheel:0,damageFlash:0};
 const specs={engine:{name:'ENGINE BLOCK',desc:'More torque · higher climb speed',base:220,max:5,icon:'⚙'},exhaust:{name:'FREE-FLOW EXHAUST',desc:'Better breathing · faster response',base:180,max:4,icon:'≋'},turbo:{name:'TURBOCHARGER',desc:'Spool up for a serious power boost',base:320,max:4,icon:'ϟ'},nos:{name:'NITROUS SYSTEM',desc:'Bigger bottle · quicker recharge',base:280,max:4,icon:'↗'},tires:{name:'TERRAIN TYRES',desc:'More bite in mud, snow and water',base:190,max:5,icon:'◉'}};
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
-function terrain(x){let y=H*.69+Math.sin(x*.0014)*37+Math.sin(x*.0041+1.3)*18+Math.sin(x*.00043)*56;const ramp=(at,len,delta)=>{let t=clamp((x-at)/len,0,1);t=t*t*(3-2*t);return delta*t};y+=ramp(720,380,-94)+ramp(1210,430,115)+ramp(2200,420,-135)+ramp(2740,400,115)+ramp(3860,650,-115)+ramp(4590,520,130);y+=ramp(5600,600,-110)+ramp(6280,620,130)+ramp(7550,460,-145)+ramp(8120,490,140);return clamp(y,H*.41,H*.87)}
+function terrain(x){
+  // Layer broad, flowing ridgelines with smaller irregularities; every curve is smooth
+  // so the suspension follows a road profile rather than hitting stair-step ramps.
+  let y=H*.68+Math.sin(x*.00048)*38+Math.sin(x*.00125+1.1)*19+Math.sin(x*.0031+.4)*7+Math.sin(x*.0067)*2.4;
+  const ridge=(center,width,height)=>{let u=(x-center)/width;return-height*Math.exp(-.72*u*u*u*u)};
+  y+=ridge(830,330,76)+ridge(1780,470,104)+ridge(2480,300,72)+ridge(3390,520,118)+ridge(4340,340,82);
+  y+=ridge(5350,440,92)+ridge(6620,620,122)+ridge(7790,380,95)+ridge(10100,620,105)+ridge(11950,460,88)+ridge(14000,570,120);
+  // Long shallow transitions keep the open-country course continuous between crests.
+  const ramp=(at,len,delta)=>{let t=clamp((x-at)/len,0,1);t=t*t*(3-2*t);return delta*t};
+  y+=ramp(9700,850,45)+ramp(10700,780,-54)+ramp(13000,900,60)+ramp(15100,850,-52);
+  return clamp(y,H*.40,H*.88)
+}
 function biomeAt(x){if(x>5700&&x<8270)return'snow';if(x>3000&&x<3890)return'mud';if(x>1760&&x<2220)return'water';if(x>8920&&x<11050)return'cave';if(x>11100&&x<12100)return'water';if(x>12500&&x<13700)return'mud';if(x>14500&&x<15800)return'snow';return'desert'}
 function surfaceInfo(b){return({desert:['RED ROCK COUNTRY','LOOSE GRAVEL','82%'],water:['FLOODPLAIN CROSSING','SHALLOW WATER','44%'],mud:['BLACK MUD FLATS','DEEP MUD','38%'],snow:['FROSTLINE PASS','PACKED SNOW','71%'],cave:['UNDERMOUNTAIN','DAMP LIMESTONE','65%']})[b]}
 function biomeColor(b){return({desert:['#bc9a67','#8b6747','#63734d'],water:['#63918c','#436f70','#4e7771'],mud:['#77745e','#514c3c','#4f5944'],snow:['#c9d4d0','#9baeb0','#788d8b'],cave:['#343b3c','#22292b','#10191b']})[b]}
@@ -43,20 +54,54 @@ const particles=[],collected=new Set();
 function currentRig(){return rigs[rigIndex]}
 function surfaceStats(x){let b=biomeAt(x),grip={desert:.82,water:.54,mud:.38,snow:.71,cave:.65}[b];grip=Math.min(1.35,grip*(1+upgrades.tires*.075)*currentRig().grip);return{b,grip}}
 function emit(x,y,color,n=5,power=100){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=Math.random()*power;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.35+Math.random()*.55,max:.9,size:2+Math.random()*4,color})}}
-function triggerJump(){if(!started||paused||crashed)return;if(car.grounded){car.vy=-Math.max(300,Math.abs(car.vx)*.48);car.grounded=false;car.av+=car.angle*.4;toast('SUSPENSION POP  ·  AIRBORNE');}}
-function physics(dt){const rig=currentRig(),surf=surfaceStats(car.x),boosting=(keys.has('shift')||touch.nos)&&car.nos>0&&car.fuel>0,gas=keys.has('d')||keys.has('arrowright')||touch.gas,brake=keys.has('a')||keys.has('arrowleft')||touch.brake;let engine=1+upgrades.engine*.19+upgrades.exhaust*.08+(upgrades.turbo*.24);let drive=gas?1:0;let nosPower=boosting?1+upgrades.nos*.1:1;if(boosting){car.nos=Math.max(0,car.nos-dt*30);car.fuel=Math.max(0,car.fuel-dt*1.25);if(Math.random()<dt*12)emit(car.x-45,car.y+9,'#73e7da',2,45)}else car.nos=Math.min(100,car.nos+dt*(6+upgrades.nos*1.4));
- let force=drive*rig.power*engine*470*nosPower;if(car.fuel<=0)force=0;let resistance=surf.b==='water'?2.9:surf.b==='mud'?2.1:surf.b==='snow'?1.3:.62;car.vx+=force/rig.mass*dt;car.vx-=car.vx*resistance*dt*.3;if(brake){if(car.vx>16)car.vx-=Math.min(car.vx,800*dt);else car.vx-=340*dt;}car.vx=clamp(car.vx,-100,rig.max*(1+upgrades.turbo*.06)*(boosting?1.38:1));
- let wheelbase=rig.length*.65,w=rig.wheel,gl=terrain(car.x-wheelbase/2),gr=terrain(car.x+wheelbase/2),slope=Math.atan2(gr-gl,wheelbase);let targetY=(gl+gr)/2-w-18;let grounded=car.y>=targetY-2&&Math.abs(car.vy)<720;
- if(grounded){if(!car.grounded&&car.vy>220){let impact=car.vy;car.hull=Math.max(0,car.hull-Math.max(0,(impact-280)*.025));if(impact>450){shake=Math.min(9,impact*.012);emit(car.x,car.y+18,'#b99b6f',7,70)}}car.y=lerp(car.y,targetY,Math.min(1,dt*22));car.vy=0;car.grounded=true;let suspension=clamp((slope-car.angle),-1,1);car.av+=suspension*dt*7;car.av-=car.av*dt*5;car.angle+=car.av*dt;let lean=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0);car.av+=lean*dt*2.7;car.angle=lerp(car.angle,slope,Math.min(1,dt*(3.3+surf.grip)));if(Math.abs(car.angle)>1.25){car.hull=Math.max(0,car.hull-dt*8);car.angle=lerp(car.angle,0,dt*.8)}
- }else{car.grounded=false;car.vy+=760*dt;car.y+=car.vy*dt;let lean=(keys.has('w')||keys.has('arrowup')?1:0)-(keys.has('s')||keys.has('arrowdown')?1:0);car.av+=lean*dt*3.4;car.av-=car.av*dt*.28;car.angle+=car.av*dt;}
- car.x=Math.max(0,car.x+car.vx*dt);car.wheel+=car.vx*dt/(w||18);car.fuel=Math.max(0,car.fuel-dt*(.09+drive*.38+Math.abs(car.vx)*.0003));if(!gas&&car.fuel<100)car.fuel=Math.min(100,car.fuel+dt*.11);if(car.damageFlash>0)car.damageFlash-=dt;
- if(car.y>H*1.25||car.hull<=0||car.fuel<=0&&Math.abs(car.vx)<13&&car.x>150){finishRun();}
- if(car.grounded){if(airtime>.25){let d=Math.max(0,car.x-jumpStart);bestJump=Math.max(bestJump,d);if(d>75){let reward=Math.min(35,Math.floor(d/22));runCoins+=reward;toast(`CLEAN LANDING  ·  ${Math.round(d)} m JUMP  ·  +${reward}¢`)}airtime=0;} }else{if(airtime===0)jumpStart=car.x;airtime+=dt;}
- runDistance=Math.max(0,Math.floor(car.x/10));let earned=Math.floor(runDistance/50);if(earned>runCoins){let add=earned-runCoins;runCoins=earned;coins+=add;persist();toast(`DISTANCE BONUS  ·  +${add}¢`)}
- for(let mark=400;mark<Math.floor(car.x/400)*400+1;mark+=400){if(!collected.has(mark)&&Math.abs(car.x-mark)<14&&Math.abs(car.y-(terrain(mark)-rig.wheel-18))<80){collected.add(mark);runCoins+=20;coins+=20;persist();emit(mark,terrain(mark)-45,'#f4d875',14,130);toast('TRAIL CACHE  ·  +20¢')}}
- for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=100*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}shake=Math.max(0,shake-dt*18);
-}
-function drawCar(){const rig=currentRig(),x=car.x-camera.x,y=car.y-camera.y;ctx.save();ctx.translate(x,y);if(shake)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);ctx.rotate(car.angle);let wb=rig.length*.34,wheel=rig.wheel;
+function triggerJump(){if(!started||paused||crashed)return;if(car.grounded){car.vy=-Math.max(260,Math.abs(car.vx)*.2);car.grounded=false;toast('SUSPENSION POP · AIRBORNE')}}
+ function physics(dt){
+  const rig=currentRig(),surf=surfaceStats(car.x),boosting=(keys.has('shift')||touch.nos)&&car.nos>0&&car.fuel>0;
+  const gas=keys.has('d')||keys.has('arrowright')||touch.gas,brake=keys.has('a')||keys.has('arrowleft')||touch.brake;
+  const lean=(keys.has('s')||keys.has('arrowdown')||touch.pitchDown?1:0)-(keys.has('w')||keys.has('arrowup')||touch.pitchUp?1:0);
+  const engine=1+upgrades.engine*.19+upgrades.exhaust*.08+upgrades.turbo*.24,drive=gas?1:0;
+  const nosPower=boosting?1+upgrades.nos*.1:1;
+  if(boosting){car.nos=Math.max(0,car.nos-dt*30);car.fuel=Math.max(0,car.fuel-dt*1.25);if(Math.random()<dt*12)emit(car.x-45,car.y+9,'#73e7da',2,45)}else car.nos=Math.min(100,car.nos+dt*(6+upgrades.nos*1.4));
+  const traction=surf.grip,force=drive*rig.power*engine*470*nosPower/rig.mass;
+  let resistance=surf.b==='water'?2.9:surf.b==='mud'?2.1:surf.b==='snow'?1.3:.62;
+  car.vx+=force*dt;car.vx-=car.vx*resistance*dt*.3;car.vx-=Math.sign(car.vx)*car.vx*car.vx*.00022*dt;
+  if(brake)car.vx-=Math.sign(car.vx)*Math.min(Math.abs(car.vx),680*traction*dt);
+  car.vx=clamp(car.vx,-100,rig.max*(1+upgrades.turbo*.06)*(boosting?1.38:1));
+  const wheelbase=rig.length*.34,wheel=rig.wheel,gl=terrain(car.x-wheelbase),gr=terrain(car.x+wheelbase);
+  const slope=Math.atan2(gr-gl,wheelbase*2),wheelDrop=wheel+12;
+  const leftTarget=gl-(-wheelbase*Math.sin(car.angle)+wheelDrop*Math.cos(car.angle));
+  const rightTarget=gr-(wheelbase*Math.sin(car.angle)+wheelDrop*Math.cos(car.angle));
+  const targetY=(leftTarget+rightTarget)*.5,wasGrounded=car.grounded;
+  car.vy+=980*dt;car.y+=car.vy*dt;
+  if(car.y>=targetY-1&&car.vy>-90){
+    const impact=Math.max(0,car.vy),landingAngle=Math.abs(car.angle-slope);car.grounded=true;
+    if(!wasGrounded&&impact>190){
+      const severity=Math.max(0,impact-250)*.028+(landingAngle>.62?(landingAngle-.62)*21:0);
+      car.hull=Math.max(0,car.hull-severity);car.damageFlash=severity>8?.22:0;
+      if(impact>450){shake=Math.min(10,impact*.014);emit(car.x,car.y+20,'#b99b6f',9,90)}
+    }
+    if(!wasGrounded){
+      if(airtime>.08){let distance=Math.max(0,car.x-jumpStart);bestJump=Math.max(bestJump,distance);
+        if(distance>75&&landingAngle<.48&&impact<620){let reward=Math.min(35,Math.floor(distance/22));runCoins+=reward;toast(`CLEAN LANDING · ${Math.round(distance)} m JUMP · +${reward}¢`)}
+        else if(landingAngle>=.48)toast('ROUGH LANDING · LEVEL THE RIG');
+      }
+      airtime=0;
+    }
+    car.y=lerp(car.y,targetY,Math.min(1,dt*(impact>260?30:19)));car.vy=impact>320?-impact*.08:0;
+    car.av+=(slope-car.angle)*dt*10*traction;car.av-=car.av*dt*5.2;car.av+=lean*dt*1.7;
+  }else{
+    car.grounded=false;car.av+=lean*dt*6.2;car.av-=car.av*dt*.22;car.av=clamp(car.av,-5.5,5.5);
+    if(airtime===0)jumpStart=car.x;airtime+=dt;
+  }
+  car.angle+=car.av*dt;if(car.grounded&&Math.abs(car.angle)>1.3)car.hull=Math.max(0,car.hull-dt*8);
+  car.x=Math.max(0,car.x+car.vx*dt);car.wheel+=car.vx*dt/(wheel||18);
+  car.fuel=Math.max(0,car.fuel-dt*(.09+drive*.38+Math.abs(car.vx)*.0003));if(!gas&&car.fuel<100)car.fuel=Math.min(100,car.fuel+dt*.11);if(car.damageFlash>0)car.damageFlash-=dt;
+  runDistance=Math.max(0,Math.floor(car.x/10));let earned=Math.floor(runDistance/50);if(earned>runCoins){let add=earned-runCoins;runCoins=earned;coins+=add;persist();toast(`DISTANCE BONUS · +${add}¢`)}
+  for(let mark=400;mark<Math.floor(car.x/400)*400+1;mark+=400){if(!collected.has(mark)&&Math.abs(car.x-mark)<14&&Math.abs(car.y-(terrain(mark)-rig.wheel-18))<80){collected.add(mark);runCoins+=20;coins+=20;persist();emit(mark,terrain(mark)-45,'#f4d875',14,130);toast('TRAIL CACHE · +20¢')}}
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=100*dt;p.life-=dt;if(p.life<=0)particles.splice(i,1)}shake=Math.max(0,shake-dt*18);
+  if(car.y>H*1.25||car.hull<=0||car.fuel<=0&&Math.abs(car.vx)<13&&car.x>150)finishRun();
+ }
+ function drawCar(){const rig=currentRig(),x=car.x-camera.x,y=car.y-camera.y;ctx.save();ctx.translate(x,y);if(shake)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);ctx.rotate(car.angle);let wb=rig.length*.34,wheel=rig.wheel;
  // grounded shadow and dust/mud spray
  ctx.fillStyle='#19201c55';ctx.beginPath();ctx.ellipse(0,wheel+21,rig.length*.57,10,0,0,7);ctx.fill();
  for(let side of [-1,1]){let wx=side*wb,wy=wheel+12;ctx.strokeStyle='#29312c';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(wx,wy-8);ctx.lineTo(wx*1.04,wy-15);ctx.stroke();ctx.fillStyle='#151a1a';ctx.beginPath();ctx.arc(wx,wy,wheel,0,7);ctx.fill();ctx.strokeStyle='#70766a';ctx.lineWidth=2;ctx.stroke();ctx.save();ctx.translate(wx,wy);ctx.rotate(car.wheel);ctx.strokeStyle='#b9b8a4';ctx.lineWidth=2;for(let i=0;i<8;i++){ctx.rotate(Math.PI/4);ctx.beginPath();ctx.moveTo(0,-wheel*.68);ctx.lineTo(0,wheel*.68);ctx.stroke()}ctx.fillStyle='#8c927f';ctx.beginPath();ctx.arc(0,0,wheel*.29,0,7);ctx.fill();ctx.restore();}
